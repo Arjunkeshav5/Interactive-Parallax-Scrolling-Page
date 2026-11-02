@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<!--
+  Asset pipeline (run via scripts/process-assets.ps1 with headless Chrome).
+  - Converts raw art-src JPGs to optimised WebP.
+  - "key-silhouette": flood-fills the white backdrop from the borders and turns it into
+    true alpha, recolouring the silhouette (exact un-mixing for dark-on-white art).
+  - "key-object": flood-fill white keying with colour decontamination (for the turtle).
+-->
+<html><head><meta charset="utf-8"></head>
+<body><pre id="out"></pre>
+<script>
+const JOBS = [
+  { src: 'hero.jpg',               out: 'hero.webp',               q: 0.84 },
+  { src: 'underwater-surface.jpg', out: 'underwater-surface.webp', q: 0.82 },
+  { src: 'rays.jpg',               out: 'rays.webp',               q: 0.80 },
+  { src: 'reef-bg.jpg',            out: 'reef-bg.webp',            q: 0.82 },
+  { src: 'biolum-bg.jpg',          out: 'biolum-bg.webp',          q: 0.84 },
+  { src: 'jellyfish.jpg',          out: 'jellyfish.webp',          q: 0.84 },
+  { src: 'abyss-bg.jpg',           out: 'abyss-bg.webp',           q: 0.84 },
+  { src: 'leviathan.jpg',          out: 'leviathan.webp',          q: 0.84 },
+  { src: 'coral-fg.jpg',  out: 'coral-fg.webp',  q: 0.86, mode: 'key-silhouette', color: [5, 28, 38] },
+  { src: 'rocks-fg.jpg',  out: 'rocks-fg.webp',  q: 0.86, mode: 'key-silhouette', color: [1, 4, 9] },
+  { src: 'turtle.jpg',    out: 'turtle.webp',    q: 0.88, mode: 'key-object', maxW: 1000 },
+];
+
+const load = (src) => new Promise((res, rej) => {
+  const img = new Image();
+  img.onload = () => res(img);
+  img.onerror = rej;
+  img.src = '../art-src/' + src;
+});
+
+function floodBackground(data, w, h, isBg) {
+  const bg = new Uint8Array(w * h);
+  const stack = [];
+  const push = (x, y) => {
+    const i = y * w + x;
+    if (!bg[i] && isBg(i * 4)) { bg[i] = 1; stack.push(i); }
+  };
+  for (let x = 0; x < w; x++) { push(x, 0); push(x, h - 1); }
+  for (let y = 0; y < h; y++) { push(0, y); push(w - 1, y); }
+  while (stack.length) {
+    const i = stack.pop();
+    const x = i % w, y = (i / w) | 0;
+    if (x > 0) push(x - 1, y);
+    if (x < w - 1) push(x + 1, y);
+    if (y > 0) push(x, y - 1);
+    if (y < h - 1) push(x, y + 1);
+  }
+  // grow 1px so anti-aliased fringe pixels are also treated softly
+  const grown = bg.slice();
+  for (let y = 1; y < h - 1; y++) for (let x = 1; x < w - 1; x++) {
+    const i = y * w + x;
+    if (!bg[i] && (bg[i - 1] || bg[i + 1] || bg[i - w] || bg[i + w])) grown[i] = 2;
+  }
+  return grown;
+}
+
+async function run() {
+  const out = document.getElementById('out');
+  const lines = [];
+  for (const job of JOBS) {
+    const img = await load(job.src);
+    let w = img.naturalWidth, h = img.naturalHeight;
+    if (job.maxW && w > job.maxW) { h = Math.round(h * job.maxW / w); w = job.maxW; }
+    const c = document.createElement('canvas');
+    c.width = w; c.height = h;
+    const ctx = c.getContext('2d');
+    ctx.drawImage(img, 0, 0, w, h);
+
+    if (job.mode) {
+      const id = ctx.getImageData(0, 0, w, h);
+      const d = id.data;
+      if (job.mode === 'key-silhouette') {
+        const lum = (p) => 0.299 * d[p] + 0.587 * d[p + 1] + 0.114 * d[p + 2];
+        const bg = floodBackground(d, w, h, (p) => lum(p) > 120);
+        const [cr, cg, cb] = job.color;
+        for (let i = 0, p = 0; i < w * h; i++, p += 4) {
+          let a = 255;
+          if (bg[i]) {
+            // dark-on-white mix: alpha = 1 - luminance (with levels to kill JPEG noise)
+            const l = lum(p);
+            a = Math.max(0, Math.min(255, (240 - l) / (240 - 30) * 255));
+          }
+          d[p] = cr; d[p + 1] = cg; d[p + 2] = cb; d[p + 3] = a;
+        }
+      } else if (job.mode === 'key-object') {
+        const minc = (p) => Math.min(d[p], d[p + 1], d[p + 2]);
+        const bg = floodBackground(d, w, h, (p) => minc(p) > 225);
+        for (let i = 0, p = 0; i < w * h; i++, p += 4) {
+          if (!bg[i]) continue;
+          const m = minc(p);
+          const a = Math.max(0, Math.min(1, (250 - m) / 60));
+          if (a > 0.01) {
+            // remove the white spill: c = (c - 255(1-a)) / a
+            for (let k = 0; k < 3; k++) d[p + k] = Math.max(0, Math.min(255, (d[p + k] - 255 * (1 - a)) / a));
+          }
+          d[p + 3] = Math.round(a * 255);
+        }
+      }
+      ctx.putImageData(id, 0, 0);
+    }
+    const url = c.toDataURL('image/webp', job.q);
+    lines.push(job.out + '|' + w + 'x' + h + '|' + url.split(',')[1]);
+  }
+  out.textContent = lines.join('\n');
+  document.title = 'DONE';
+}
+run().catch((e) => { document.getElementById('out').textContent = 'ERROR|' + e; });
+</script>
+</body></html>

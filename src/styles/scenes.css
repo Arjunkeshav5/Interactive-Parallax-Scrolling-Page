@@ -1,0 +1,747 @@
+/* ───────────────────────── BELOW THE SURFACE · scenes & layers ───────────────────────── */
+/* Rule: [data-layer] elements are transformed by the engine — never give them a CSS
+   transform. Ambient CSS animations always run on a child element instead.          */
+
+.journey {
+  position: relative;
+}
+
+.scene {
+  position: relative;
+  height: calc(var(--vh) * var(--h));
+}
+.scene--overlap {
+  margin-top: calc(var(--vh) * -100);
+}
+
+.scene__stage {
+  position: sticky;
+  top: 0;
+  height: calc(var(--vh) * 100);
+  overflow: hidden;
+  isolation: isolate;
+  background: var(--midnight);
+}
+
+/* entering stages dissolve in smoothly over the pinned scene beneath them */
+.scene__stage--edge-fade {
+  --e: clamp(0, calc(var(--s, 0) * -1.2), 1);
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0%, #000 calc(var(--e) * 65% + 12%));
+  mask-image: linear-gradient(to bottom, transparent 0%, #000 calc(var(--e) * 65% + 12%));
+}
+
+/* the surface crossing: a moving water line instead of a fade */
+.scene__stage--edge-wave {
+  --e: clamp(0, calc(var(--s, 0) * -1.4), 1);
+  --wh: calc(var(--e) * 12vh + 1px);
+  -webkit-mask-image: var(--wave-mask), linear-gradient(#000, #000);
+  mask-image: var(--wave-mask), linear-gradient(#000, #000);
+  -webkit-mask-size: 50% var(--wh), 100% 100%;
+  mask-size: 50% var(--wh), 100% 100%;
+  -webkit-mask-position: 0 0, 0 var(--wh);
+  mask-position: 0 0, 0 var(--wh);
+  -webkit-mask-repeat: repeat-x, no-repeat;
+  mask-repeat: repeat-x, no-repeat;
+}
+
+.layer {
+  position: absolute;
+  pointer-events: none;
+  will-change: transform;
+  backface-visibility: hidden;
+}
+
+/* full-bleed backgrounds with vertical overscan for travel */
+.bg {
+  left: 0;
+  right: 0;
+  top: calc(var(--vh) * -12);
+  bottom: calc(var(--vh) * -30);
+  transform-origin: 50% 40%;
+}
+.bg img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.rays {
+  left: -5%;
+  right: -5%;
+  top: calc(var(--vh) * -8);
+  height: calc(var(--vh) * 120);
+  mix-blend-mode: screen;
+  opacity: 0.5;
+}
+.rays img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transform-origin: 50% 0;
+  animation: ray-sway 16s ease-in-out infinite alternate;
+}
+@keyframes ray-sway {
+  0% {
+    transform: rotate(-2.2deg) scale(1.08);
+    opacity: 0.75;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    transform: rotate(2.2deg) scale(1.14);
+    opacity: 0.8;
+  }
+}
+
+.content {
+  inset: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 max(var(--gutter), 7vw);
+}
+.content a,
+.content button {
+  pointer-events: auto;
+}
+
+.fishlayer {
+  inset: 0;
+}
+.fish-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* ═════════ 01 · THE OCEAN ABOVE ═════════ */
+
+.bg--hero img {
+  object-position: 64% 50%;
+}
+
+.hero__sun {
+  left: calc(64% - 38vmax);
+  top: calc(var(--vh) * 46 - 38vmax);
+  width: 76vmax;
+  height: 76vmax;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    rgba(255, 238, 205, 0.55) 0%,
+    rgba(255, 196, 140, 0.22) 14%,
+    rgba(255, 170, 120, 0.08) 32%,
+    rgba(255, 170, 120, 0) 60%
+  );
+  mix-blend-mode: screen;
+  animation: sun-breathe 7s ease-in-out infinite;
+}
+@keyframes sun-breathe {
+  0%,
+  100% {
+    opacity: 0.8;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.hero__haze {
+  inset: calc(var(--vh) * -10) 0 auto 0;
+  height: calc(var(--vh) * 70);
+  background: linear-gradient(to bottom, rgba(2, 9, 18, 0.62) 0%, rgba(6, 22, 38, 0.25) 45%, rgba(6, 22, 38, 0) 100%);
+}
+
+.wave {
+  left: 0;
+  right: 0;
+}
+.wave--far {
+  top: calc(var(--vh) * 60);
+  height: calc(var(--vh) * 100);
+  --wh: 4.5vh;
+}
+.wave--mid {
+  top: calc(var(--vh) * 72);
+  height: calc(var(--vh) * 120);
+  --wh: 7vh;
+}
+.wave--near {
+  top: calc(var(--vh) * 84);
+  height: calc(var(--vh) * 170);
+  --wh: 11vh;
+}
+
+.waveband {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+.wave--far .waveband {
+  filter: brightness(1.05) saturate(0.85);
+  opacity: 0.85;
+}
+.wave--mid .waveband {
+  filter: brightness(0.9);
+}
+.wave--near .waveband {
+  filter: brightness(0.8) contrast(1.05);
+}
+
+.waveband__track {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 400%;
+  height: 100%;
+  display: flex;
+  animation: wave-slide var(--dur, 40s) linear infinite;
+  -webkit-mask-image: var(--wave-mask), linear-gradient(#000, #000);
+  mask-image: var(--wave-mask), linear-gradient(#000, #000);
+  -webkit-mask-size: 12.5% var(--wh), 100% 100%;
+  mask-size: 12.5% var(--wh), 100% 100%;
+  -webkit-mask-position: 0 0, 0 calc(var(--wh) - 1px);
+  mask-position: 0 0, 0 calc(var(--wh) - 1px);
+  -webkit-mask-repeat: repeat-x, no-repeat;
+  mask-repeat: repeat-x, no-repeat;
+}
+.waveband__track.is-reverse {
+  animation-direction: reverse;
+}
+.waveband__track::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    to bottom,
+    rgba(101, 245, 232, 0.25) 0,
+    rgba(25, 181, 181, 0.1) calc(var(--wh) * 0.8),
+    rgba(7, 59, 92, 0.45) calc(var(--wh) * 1.5),
+    rgba(6, 22, 38, 0.85) 45%,
+    #020912 85%
+  );
+}
+.wave--far .waveband__track::after {
+  background: linear-gradient(
+    to bottom,
+    rgba(255, 230, 200, 0.35) 0,
+    rgba(7, 59, 92, 0.5) calc(var(--wh) * 1.2),
+    rgba(6, 22, 38, 0.85) 40%,
+    #020912 80%
+  );
+}
+.waveband__tile {
+  flex: 0 0 25%;
+  height: 100%;
+  background-repeat: no-repeat;
+}
+.wave--far .waveband__tile {
+  background-size: 150% auto;
+}
+.wave--mid .waveband__tile {
+  background-size: 200% auto;
+}
+.wave--near .waveband__tile {
+  background-size: 260% auto;
+  background-color: #041626;
+}
+.waveband__tile.is-flip {
+  transform: scaleX(-1);
+}
+@keyframes wave-slide {
+  from {
+    transform: translate3d(0, 0, 0);
+  }
+  to {
+    transform: translate3d(-50%, 0, 0);
+  }
+}
+
+.content--hero {
+  align-items: flex-start;
+  padding-top: calc(var(--vh) * 15);
+}
+
+/* ═════════ 02 · CROSSING THE SURFACE ═════════ */
+
+.bg--beneath img {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  height: 160%;
+  object-position: 50% 100%;
+}
+.bg--beneath {
+  overflow: hidden;
+}
+
+.beneath__surface {
+  left: 0;
+  right: 0;
+  top: calc(var(--vh) * -2);
+  height: calc(var(--vh) * 150);
+}
+.beneath__surface img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: 50% 0;
+  filter: brightness(1.08) saturate(1.05);
+  -webkit-mask-image: linear-gradient(to bottom, #000 0%, #000 22%, transparent 44%);
+  mask-image: linear-gradient(to bottom, #000 0%, #000 22%, transparent 44%);
+}
+
+.rays--beneath {
+  opacity: 0.55;
+}
+
+.deepen {
+  inset: 0;
+  opacity: 0;
+}
+.deepen--beneath {
+  background: linear-gradient(to bottom, rgba(7, 59, 92, 0.25) 0%, rgba(6, 22, 38, 0.85) 55%, #020912 100%);
+}
+
+/* ═════════ 03 · THE LIVING OCEAN ═════════ */
+
+.bg--reef img {
+  object-position: 60% 50%;
+  filter: saturate(1.05) contrast(1.04);
+}
+.rays--reef {
+  opacity: 0.28;
+}
+.fishlayer--school {
+  top: calc(var(--vh) * 2);
+  bottom: calc(var(--vh) * 18);
+  left: 0;
+  right: 0;
+}
+
+.turtle {
+  right: 7vw;
+  top: calc(var(--vh) * 26);
+  width: clamp(240px, 33vw, 620px);
+}
+.turtle__glide {
+  position: relative;
+  animation: turtle-glide 10s ease-in-out infinite;
+}
+.turtle__glide img {
+  width: 100%;
+  height: auto;
+  filter: saturate(0.72) brightness(0.86) contrast(1.06) drop-shadow(0 40px 50px rgba(2, 9, 18, 0.35));
+}
+@keyframes turtle-glide {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) rotate(-2deg);
+  }
+  50% {
+    transform: translate3d(-1.5vw, -2.2vh, 0) rotate(1.5deg);
+  }
+}
+
+.coral {
+  left: -6vw;
+  width: 112vw;
+  bottom: -14vw;
+}
+.coral img {
+  width: 100%;
+  height: auto;
+}
+.coral__fill {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(100% - 2px);
+  height: calc(var(--vh) * 160);
+  background: #051c26;
+}
+.coral--mid img {
+  opacity: 0.94;
+}
+.coral--near {
+  left: -26vw;
+  width: 150vw;
+  bottom: -40vw;
+  filter: blur(3px) brightness(0.45);
+}
+.coral--near img {
+  transform: scaleX(-1);
+}
+
+.content--left {
+  justify-content: flex-start;
+  padding-left: max(var(--gutter), 8vw);
+  background: radial-gradient(60% 55% at 22% 50%, rgba(2, 9, 18, 0.5), rgba(2, 9, 18, 0) 70%);
+}
+
+/* ═════════ 04 · THE BIOLUMINESCENT WORLD ═════════ */
+
+.bg--glow img {
+  object-position: 50% 80%;
+}
+
+.plankton {
+  inset: calc(var(--vh) * -20) -10% calc(var(--vh) * -40);
+  mix-blend-mode: screen;
+  opacity: 0.55;
+}
+.plankton img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transform: scale(1.7) rotate(180deg);
+  -webkit-mask-image: linear-gradient(to top, transparent 0%, #000 40%);
+  mask-image: linear-gradient(to top, transparent 0%, #000 40%);
+}
+
+.jelly {
+  mix-blend-mode: screen;
+}
+.jelly__float {
+  animation: jelly-float var(--fd, 18s) ease-in-out infinite;
+}
+.jelly img {
+  width: 100%;
+  height: auto;
+  transform-origin: 50% 18%;
+  animation: jelly-pulse var(--pd, 4.4s) ease-in-out infinite;
+}
+@keyframes jelly-float {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0);
+  }
+  33% {
+    transform: translate3d(1.2vw, -3vh, 0);
+  }
+  66% {
+    transform: translate3d(-1vw, -1.2vh, 0);
+  }
+}
+@keyframes jelly-pulse {
+  0%,
+  100% {
+    transform: scale(1, 1);
+  }
+  35% {
+    transform: scale(1.045, 0.93);
+  }
+  60% {
+    transform: scale(0.98, 1.03);
+  }
+}
+.jelly--far {
+  left: 16%;
+  top: calc(var(--vh) * 16);
+  width: clamp(80px, 8vw, 160px);
+  opacity: 0.55;
+}
+.jelly--far img {
+  filter: blur(1.5px) hue-rotate(35deg);
+  --pd: 5.6s;
+}
+.jelly--far .jelly__float {
+  --fd: 24s;
+}
+.jelly--main {
+  right: 9%;
+  top: calc(var(--vh) * 12);
+  width: clamp(200px, 25vw, 460px);
+}
+.jelly--main .jelly__float {
+  --fd: 20s;
+}
+.jelly--left {
+  left: 5%;
+  top: calc(var(--vh) * 46);
+  width: clamp(130px, 14vw, 270px);
+  opacity: 0.9;
+}
+.jelly--left img {
+  filter: hue-rotate(55deg) saturate(1.2);
+  --pd: 3.6s;
+}
+.jelly--left .jelly__float {
+  --fd: 15s;
+}
+.jelly--near {
+  right: -10vw;
+  top: calc(var(--vh) * 78);
+  width: 44vw;
+  opacity: 0.4;
+}
+.jelly--near img {
+  filter: blur(8px) hue-rotate(-18deg);
+  --pd: 5s;
+}
+.jelly--near .jelly__float {
+  --fd: 26s;
+}
+
+.glow__torch {
+  position: absolute;
+  inset: 0;
+  z-index: 8;
+  pointer-events: none;
+  mix-blend-mode: screen;
+  background: radial-gradient(
+    circle at var(--mx, 62%) var(--my, 42%),
+    rgba(101, 245, 232, 0.14) 0%,
+    rgba(130, 110, 255, 0.07) 14%,
+    rgba(130, 110, 255, 0) 34%
+  );
+}
+.content--glow .display {
+  text-shadow: 0 0 60px rgba(101, 245, 232, 0.25), 0 2px 30px rgba(2, 9, 18, 0.6);
+}
+
+/* ═════════ 05 · THE ABYSS ═════════ */
+
+.bg--abyss img {
+  object-position: 50% 30%;
+  filter: brightness(0.85);
+}
+.rays--abyss {
+  opacity: 0.16;
+}
+.leviathan {
+  left: -8vw;
+  top: calc(var(--vh) * 18);
+  width: 84vw;
+  mix-blend-mode: screen;
+  opacity: 0.9;
+}
+.leviathan img {
+  width: 100%;
+  height: auto;
+  filter: brightness(1.7) contrast(1.1);
+}
+.leviathan__drift {
+  animation: lev-drift 30s ease-in-out infinite alternate;
+}
+@keyframes lev-drift {
+  0% {
+    transform: translate3d(-3vw, 1vh, 0) rotate(0.6deg);
+  }
+  100% {
+    transform: translate3d(4vw, -1.5vh, 0) rotate(-0.8deg);
+  }
+}
+
+.rocks {
+  left: -6vw;
+  width: 112vw;
+  bottom: -9vw;
+}
+.rocks img {
+  width: 100%;
+  height: auto;
+}
+.rocks__fill {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(100% - 2px);
+  height: calc(var(--vh) * 160);
+  background: #010409;
+}
+.rocks--mid {
+  opacity: 0.88;
+  filter: drop-shadow(0 -1px 0 rgba(101, 245, 232, 0.18));
+}
+.rocks--near {
+  left: -28vw;
+  width: 156vw;
+  bottom: -34vw;
+  filter: blur(2.5px);
+}
+.rocks--near img {
+  transform: scaleX(-1);
+}
+
+.vignette {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  pointer-events: none;
+  background: radial-gradient(120% 90% at 50% 38%, rgba(0, 0, 0, 0) 40%, rgba(0, 0, 0, 0.7) 100%);
+}
+.content--abyss .display {
+  font-size: clamp(2.3rem, 5.4vw, 5.6rem);
+}
+
+/* ═════════ 06 · THE JOURNEY CONTINUES ═════════ */
+
+.bg--beyond {
+  overflow: hidden;
+}
+.bg--beyond img {
+  transform: scale(1.18);
+  object-position: 50% 0%;
+  filter: saturate(1.1) brightness(1.05);
+}
+.bg--beyond::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    to top,
+    #020912 0%,
+    rgba(2, 9, 18, 0.92) 26%,
+    rgba(6, 22, 38, 0.55) 48%,
+    rgba(7, 59, 92, 0.1) 72%,
+    rgba(7, 59, 92, 0) 100%
+  );
+}
+.rays--beyond {
+  opacity: 0.7;
+}
+.beyond__glow {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  z-index: 4;
+  width: 120vmax;
+  height: 70vmax;
+  margin: -35vmax 0 0 -60vmax;
+  border-radius: 50%;
+  pointer-events: none;
+  mix-blend-mode: screen;
+  background: radial-gradient(closest-side, rgba(200, 255, 250, 0.35), rgba(101, 245, 232, 0.08) 50%, rgba(101, 245, 232, 0) 100%);
+  animation: sun-breathe 8s ease-in-out infinite;
+}
+.content--final {
+  padding-bottom: calc(var(--vh) * 6);
+}
+
+/* ═════════ responsive ═════════ */
+
+@media (max-width: 1024px) {
+  .coral--near,
+  .rocks--near {
+    filter: brightness(0.45);
+  }
+  .rocks--near {
+    filter: none;
+  }
+  .jelly--near img {
+    filter: blur(4px) hue-rotate(-18deg);
+  }
+}
+
+@media (max-width: 767px) {
+  .scene {
+    height: calc(var(--vh) * var(--hm));
+  }
+
+  .bg--hero img {
+    object-position: 66% 50%;
+  }
+  .hero__sun {
+    left: calc(50% - 38vmax);
+  }
+  .wave--far {
+    top: calc(var(--vh) * 62);
+  }
+  .wave--mid {
+    top: calc(var(--vh) * 73);
+  }
+  .wave--near {
+    top: calc(var(--vh) * 85);
+  }
+  .waveband__track {
+    -webkit-mask-size: 25% var(--wh), 100% 100%;
+    mask-size: 25% var(--wh), 100% 100%;
+  }
+  .wave--far .waveband__tile,
+  .wave--mid .waveband__tile,
+  .wave--near .waveband__tile {
+    background-size: cover;
+  }
+  .content--hero {
+    padding-top: calc(var(--vh) * 22);
+  }
+
+  .turtle {
+    right: -6vw;
+    top: calc(var(--vh) * 52);
+    width: 70vw;
+  }
+  .coral {
+    left: -60vw;
+    width: 230vw;
+    bottom: -22vw;
+  }
+  .coral--near {
+    left: -90vw;
+    width: 300vw;
+    bottom: -90vw;
+  }
+  .content--left {
+    align-items: flex-start;
+    padding-top: calc(var(--vh) * 18);
+    background: linear-gradient(to bottom, rgba(2, 9, 18, 0.55), rgba(2, 9, 18, 0) 60%);
+  }
+
+  .jelly--main {
+    right: -8%;
+    top: calc(var(--vh) * 8);
+    width: 56vw;
+  }
+  .jelly--left {
+    left: -4%;
+    top: calc(var(--vh) * 58);
+    width: 32vw;
+  }
+  .jelly--far {
+    left: 12%;
+    width: 16vw;
+  }
+  .jelly--near {
+    width: 70vw;
+    right: -30vw;
+  }
+
+  .leviathan {
+    left: -40vw;
+    width: 170vw;
+    top: calc(var(--vh) * 22);
+  }
+  .rocks {
+    left: -50vw;
+    width: 200vw;
+    bottom: -14vw;
+  }
+  .rocks--near {
+    left: -80vw;
+    width: 260vw;
+    bottom: -70vw;
+  }
+
+  .content {
+    padding: 0 22px;
+  }
+}
+
+/* ═════════ reduced motion: no pinning, no travel, calm stacked chapters ═════════ */
+
+@media (prefers-reduced-motion: reduce) {
+  .scene {
+    height: calc(var(--vh) * 100) !important;
+  }
+  .scene--overlap {
+    margin-top: 0;
+  }
+  .scene__stage--edge-fade,
+  .scene__stage--edge-wave {
+    -webkit-mask-image: none;
+    mask-image: none;
+  }
+}
